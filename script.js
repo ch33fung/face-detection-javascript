@@ -15,7 +15,27 @@ function startVideo() {
   )
 }
 
-video.addEventListener('play', () => {
+function getLabeledFaceDescriptions() {
+  const labels = ["cheefung"];
+  return Promise.all(
+    labels.map(async (label) => {
+      const descriptions = [];
+      for (let i = 1; i <= 2; i++) {
+        const img = await faceapi.fetchImage(`./labels/${label}/${i}.png`);
+        const detections = await faceapi
+          .detectSingleFace(img)
+          .withFaceLandmarks()
+          .withFaceExpressions()
+          descriptions.push(detections.descriptor);
+      }
+      return new faceapi.LabeledFaceDescriptors(label, descriptions);
+    })
+  );
+}
+
+video.addEventListener('play', async () => {
+  const labeledFaceDescriptors = await getLabeledFaceDescriptions();
+  const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors);
   const canvas = faceapi.createCanvasFromMedia(video)
   document.body.append(canvas)
 
@@ -23,7 +43,7 @@ video.addEventListener('play', () => {
     faceapi.matchDimensions(canvas, displaySize)
 
   setInterval(async () => {
-
+    
     const detections = await faceapi.detectAllFaces(video, new faceapi
       .TinyFaceDetectorOptions())
       .withFaceLandmarks()
@@ -34,5 +54,9 @@ video.addEventListener('play', () => {
       faceapi.draw.drawDetections(canvas, resizedDetections)
       faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
       faceapi.draw.drawFaceExpressions(canvas, resizedDetections)
+
+      const results = resizedDetections.map((d) => {
+        return faceMatcher.findBestMatch(d.descriptor);
+      });
   }, 100)
 })
